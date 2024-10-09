@@ -46,51 +46,64 @@ export class Whiteboard extends Component {
   }
 
   mounted() {
-    // Connect to the websocket server
-    this.connection = new WebSocket('ws://localhost:3000');
+    try {
+      // Connect to the websocket server
+      this.connection = new WebSocket('ws://localhost:3000/api/v1/whiteboard');
 
-    // Called when the connection is ready
-    this.connection.onopen = () => {
-      this.connected = true;
-      // Send the current user to the server
-      this.connection?.send(JSON.stringify({ user: this.state.user }));
-    };
+      // Called when the connection is ready
+      this.connection.onopen = () => {
+        this.connected = true;
+        // Send the current user to the server
+        this.connection?.send(JSON.stringify({ type: 'user', user: this.state.user }));
+      };
 
-    // Called on incoming message
-    this.connection.onmessage = (message) => {
-      const data = JSON.parse(message.data);
-      if (data.text) {
-        // It's a message
-        this.setState((prevState) => ({
-          messages: [...prevState.messages, data],
-        }));
-      } else if (data.users) {
-        // It's the updated list of users
-        this.setState({ users: data.users });
-      }
-    };
+      // Called on incoming message
+      this.connection.onmessage = (message) => {
+        try {
+          const data = JSON.parse(message.data);
+          if (data.text) {
+            // It's a message
+            this.setState((prevState) => ({
+              messages: [...prevState.messages, data],
+            }));
+          } else if (data.users) {
+            // It's the updated list of users
+            this.setState({ users: data.users });
+          }
+        } catch (error) {
+          Alert.danger('Failed to process incoming message: ' + error.message);
+        }
+      };
 
-    // Called if connection is closed
-    this.connection.onclose = (event) => {
-      this.connected = false;
-      Alert.danger('Connection closed with code ' + event.code + ' and reason: ' + event.reason);
-    };
+      // Called if connection is closed
+      this.connection.onclose = (event) => {
+        this.connected = false;
+        Alert.danger('Connection closed with code ' + event.code + ' and reason: ' + event.reason);
+      };
 
-    // Called on connection error
-    this.connection.onerror = () => {
-      this.connected = false;
-      Alert.danger('Connection error');
-    };
+      // Called on connection error
+      this.connection.onerror = (error) => {
+        this.connected = false;
+        Alert.danger('Connection error: ' + error.message);
+      };
+    } catch (error) {
+      Alert.danger('Failed to establish WebSocket connection: ' + error.message);
+    }
   }
 
   sendMessage = () => {
     if (this.connection && this.connected) {
       const message = {
+        type: 'message',
         user: this.state.user,
         text: this.state.currentMessage,
       };
-      this.connection.send(JSON.stringify(message));
-      this.setState({ currentMessage: '' }); // Clear the input field after sending
+      try {
+        this.connection.send(JSON.stringify(message));
+        this.setState({ currentMessage: '' }); // Clear the input field after sending
+      } catch (error) {
+        Alert.danger('Failed to send message: ' + error.message);
+      }
     }
   };
 
